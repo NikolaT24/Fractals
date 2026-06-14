@@ -1,1 +1,488 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Развитие на папрат като фрактал</title>
+  <style>
+    :root {
+      --bg-1: #06110b;
+      --bg-2: #101b16;
+      --panel: rgba(20, 34, 28, 0.78);
+      --panel-border: rgba(255, 255, 255, 0.12);
+      --text: #effff4;
+      --muted: #a9cdb6;
+      --accent: #8fffb4;
+    }
 
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      color: var(--text);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at 18% 12%, rgba(143, 255, 180, 0.18), transparent 28rem),
+        radial-gradient(circle at 84% 24%, rgba(139, 213, 255, 0.11), transparent 30rem),
+        radial-gradient(circle at 50% 110%, rgba(166, 227, 161, 0.12), transparent 32rem),
+        linear-gradient(135deg, var(--bg-1), var(--bg-2) 58%, #050907);
+    }
+
+    .app {
+      width: min(1040px, calc(100vw - 28px));
+      padding: 28px 0;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 18px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(2rem, 5vw, 4.2rem);
+      line-height: 1;
+      font-weight: 850;
+      letter-spacing: -0.06em;
+      background: linear-gradient(90deg, #d9f99d, #8fffb4, #8bd5ff);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+
+    .subtitle {
+      margin: 12px auto 0;
+      max-width: 760px;
+      color: var(--muted);
+      font-size: 1rem;
+    }
+
+    .controls {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 14px;
+      background: var(--panel);
+      border: 1px solid var(--panel-border);
+      backdrop-filter: blur(14px);
+      padding: 16px;
+      border-radius: 24px;
+      margin: 22px auto;
+      box-shadow: 0 18px 44px rgba(0, 0, 0, 0.32);
+    }
+
+    .control-group {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding: 14px;
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.045);
+    }
+
+    label {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      color: var(--muted);
+      font-size: 0.9rem;
+      font-weight: 650;
+    }
+
+    label span {
+      color: var(--text);
+      font-variant-numeric: tabular-nums;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--accent);
+      cursor: pointer;
+    }
+
+    .button-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    button {
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      border-radius: 999px;
+      padding: 10px 12px;
+      color: var(--text);
+      background: rgba(143, 255, 180, 0.11);
+      font-weight: 750;
+      cursor: pointer;
+      transition: transform 0.18s ease, background 0.18s ease, border-color 0.18s ease;
+    }
+
+    button:hover {
+      transform: translateY(-1px);
+      background: rgba(143, 255, 180, 0.18);
+      border-color: rgba(143, 255, 180, 0.42);
+    }
+
+    .stage {
+      border-radius: 28px;
+      padding: 1px;
+      background: linear-gradient(135deg, rgba(143,255,180,0.44), rgba(139,213,255,0.24), rgba(203,166,247,0.22));
+      box-shadow: 0 24px 62px rgba(0, 0, 0, 0.42);
+      overflow: hidden;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: min(68vh, 650px);
+      min-height: 430px;
+      border-radius: 27px;
+      background: #07100a;
+    }
+
+    .hint {
+      text-align: center;
+      color: rgba(239, 255, 244, 0.6);
+      font-size: 0.88rem;
+      margin-top: 14px;
+    }
+
+    @media (max-width: 900px) {
+      .controls { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+
+    @media (max-width: 620px) {
+      .controls { grid-template-columns: 1fr; }
+      canvas { min-height: 540px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header>
+      <h1>Разлистване на папрат</h1>
+      <p class="subtitle">От навито „охлювче“ до цял лист: главната ос се разгъва нагоре, а страничните листчета се отварят последователно, както младата папрат излиза от спирална пъпка.</p>
+    </header>
+
+    <section class="controls" aria-label="Fractal controls">
+      <div class="control-group">
+        <label for="growth">Растеж <span id="growthVal">0%</span></label>
+        <input type="range" id="growth" min="0" max="100" value="0" />
+      </div>
+
+      <div class="control-group">
+        <label for="leaflets">Листчета <span id="leafletsVal">22</span></label>
+        <input type="range" id="leaflets" min="8" max="34" value="22" />
+      </div>
+
+      <div class="control-group">
+        <label for="curl">Начална спирала <span id="curlVal">4.2</span></label>
+        <input type="range" id="curl" min="22" max="62" value="42" />
+      </div>
+
+      <div class="control-group">
+        <label>Движение <span id="stateVal">включено</span></label>
+        <div class="button-row">
+          <button id="playBtn" type="button">Пауза</button>
+          <button id="resetBtn" type="button">Наново</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="stage">
+      <canvas id="fractalCanvas"></canvas>
+    </section>
+
+    <p class="hint">В началото всичко е свито в кълбо. После централната жилка се разгъва, а малките листчета се отварят като зелени ветрила ✦</p>
+  </main>
+
+  <script>
+    const canvas = document.getElementById('fractalCanvas');
+    const ctx = canvas.getContext('2d');
+
+    const growthSlider = document.getElementById('growth');
+    const leafletsSlider = document.getElementById('leaflets');
+    const curlSlider = document.getElementById('curl');
+
+    const growthVal = document.getElementById('growthVal');
+    const leafletsVal = document.getElementById('leafletsVal');
+    const curlVal = document.getElementById('curlVal');
+    const stateVal = document.getElementById('stateVal');
+
+    const playBtn = document.getElementById('playBtn');
+    const resetBtn = document.getElementById('resetBtn');
+
+    let renderQueued = false;
+    let playing = true;
+    let autoGrowth = 0;
+    let lastTime = performance.now();
+
+    function clamp(value, min, max) {
+      return Math.max(min, Math.min(max, value));
+    }
+
+    function smoothstep(t) {
+      t = clamp(t, 0, 1);
+      return t * t * (3 - 2 * t);
+    }
+
+    function easeOutCubic(t) {
+      t = clamp(t, 0, 1);
+      return 1 - Math.pow(1 - t, 3);
+    }
+
+    function resizeCanvas() {
+      const rect = canvas.getBoundingClientRect();
+      const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+      canvas.width = Math.floor(rect.width * dpr);
+      canvas.height = Math.floor(rect.height * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      requestRender();
+    }
+
+    function drawBackground(width, height) {
+      const sky = ctx.createLinearGradient(0, 0, 0, height);
+      sky.addColorStop(0, '#07100a');
+      sky.addColorStop(0.58, '#102017');
+      sky.addColorStop(1, '#030604');
+      ctx.fillStyle = sky;
+      ctx.fillRect(0, 0, width, height);
+
+      const glow = ctx.createRadialGradient(width * 0.52, height * 0.58, 10, width * 0.52, height * 0.58, width * 0.48);
+      glow.addColorStop(0, 'rgba(143, 255, 180, 0.16)');
+      glow.addColorStop(0.45, 'rgba(139, 213, 255, 0.06)');
+      glow.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = glow;
+      ctx.fillRect(0, 0, width, height);
+
+      ctx.fillStyle = 'rgba(255,255,255,0.42)';
+      for (let i = 0; i < 38; i++) {
+        const x = (Math.sin(i * 82.13) * 0.5 + 0.5) * width;
+        const y = (Math.sin(i * 39.71 + 2) * 0.5 + 0.5) * height * 0.72;
+        const radius = i % 8 === 0 ? 1.15 : 0.65;
+        ctx.beginPath();
+        ctx.arc(x, y, radius, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    function drawLeaflet(length, depth, openness) {
+      if (depth <= 0 || length < 3 || openness <= 0.01) return;
+
+      const width = length * (0.22 + depth * 0.02) * openness;
+      const alpha = 0.16 + depth * 0.045;
+
+      const leafGradient = ctx.createLinearGradient(0, 0, length, 0);
+      leafGradient.addColorStop(0, `rgba(178, 255, 191, ${alpha})`);
+      leafGradient.addColorStop(0.55, `rgba(121, 230, 151, ${alpha + 0.16})`);
+      leafGradient.addColorStop(1, `rgba(214, 255, 160, ${alpha})`);
+
+      ctx.fillStyle = leafGradient;
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.quadraticCurveTo(length * 0.46, -width, length, 0);
+      ctx.quadraticCurveTo(length * 0.46, width, 0, 0);
+      ctx.fill();
+
+      ctx.strokeStyle = `rgba(220, 255, 202, ${0.18 + openness * 0.28})`;
+      ctx.lineWidth = Math.max(0.7, depth * 0.22);
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(length, 0);
+      ctx.stroke();
+
+      ctx.save();
+      ctx.translate(length * 0.55, 0);
+      ctx.rotate(-0.64 * openness);
+      ctx.scale(0.72, 0.72);
+      drawLeaflet(length * 0.52, depth - 1, openness * 0.98);
+      ctx.restore();
+
+      ctx.save();
+      ctx.translate(length * 0.55, 0);
+      ctx.rotate(0.64 * openness);
+      ctx.scale(0.72, 0.72);
+      drawLeaflet(length * 0.52, depth - 1, openness * 0.98);
+      ctx.restore();
+    }
+
+    function getStemPoint(t, growth, width, height, maxCurl) {
+      const unfurl = smoothstep(growth);
+      const heightScale = Math.min(width, height) * 0.62;
+      const finalX = Math.sin((t - 0.12) * Math.PI * 1.05) * Math.sin(t * Math.PI) * 0.16 * heightScale;
+      const finalY = -t * heightScale;
+
+      const coilTurns = maxCurl * (1 - unfurl);
+      const coilRadius = heightScale * (0.22 - 0.12 * unfurl) * Math.pow(1 - t, 0.55);
+      const theta = t * Math.PI * 2 * coilTurns - Math.PI / 2;
+      const coilX = Math.cos(theta) * coilRadius;
+      const coilY = -heightScale * 0.08 - Math.sin(theta) * coilRadius;
+
+      const x = coilX * (1 - unfurl) + finalX * unfurl;
+      const y = coilY * (1 - unfurl) + finalY * unfurl;
+      return { x, y };
+    }
+
+    function drawStemPath(growth, width, height, maxCurl) {
+      const steps = 160;
+      const gradient = ctx.createLinearGradient(0, 0, 0, -height * 0.7);
+      gradient.addColorStop(0, 'rgba(183, 255, 193, 0.74)');
+      gradient.addColorStop(0.55, 'rgba(117, 232, 148, 0.58)');
+      gradient.addColorStop(1, 'rgba(218, 255, 160, 0.28)');
+
+      ctx.strokeStyle = gradient;
+      ctx.lineWidth = 5;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.beginPath();
+
+      for (let i = 0; i <= steps; i++) {
+        const t = i / steps;
+        const p = getStemPoint(t, growth, width, height, maxCurl);
+        if (i === 0) ctx.moveTo(p.x, p.y);
+        else ctx.lineTo(p.x, p.y);
+      }
+      ctx.stroke();
+    }
+
+    function tangentAngle(t, growth, width, height, maxCurl) {
+      const a = getStemPoint(clamp(t - 0.004, 0, 1), growth, width, height, maxCurl);
+      const b = getStemPoint(clamp(t + 0.004, 0, 1), growth, width, height, maxCurl);
+      return Math.atan2(b.y - a.y, b.x - a.x);
+    }
+
+    function drawFern(width, height, now) {
+      const manualGrowth = Number(growthSlider.value) / 100;
+      const growth = Math.max(manualGrowth, autoGrowth);
+      const easedGrowth = smoothstep(growth);
+      const leafletCount = Number(leafletsSlider.value);
+      const maxCurl = Number(curlSlider.value) / 10;
+
+      growthVal.textContent = `${Math.round(easedGrowth * 100)}%`;
+      leafletsVal.textContent = leafletCount;
+      curlVal.textContent = maxCurl.toFixed(1);
+      stateVal.textContent = playing ? 'включено' : 'пауза';
+
+      ctx.save();
+      ctx.translate(width * 0.5, height * 0.88);
+      ctx.rotate(Math.sin(now * 0.85) * 0.018 * easedGrowth);
+
+      drawStemPath(easedGrowth, width, height, maxCurl);
+
+      const maxLeafletLength = Math.min(width, height) * 0.19;
+      const earliestOpen = 0.12;
+      const latestOpen = 0.9;
+
+      for (let i = 0; i < leafletCount; i++) {
+        const t = (i + 1) / (leafletCount + 1);
+        const side = i % 2 === 0 ? -1 : 1;
+        const openDelay = earliestOpen + t * (latestOpen - earliestOpen);
+        const localOpen = easeOutCubic((easedGrowth - openDelay) / 0.22);
+        const visibility = smoothstep((easedGrowth - t * 0.55) / 0.18);
+
+        if (visibility <= 0.01) continue;
+
+        const p = getStemPoint(t, easedGrowth, width, height, maxCurl);
+        const angle = tangentAngle(t, easedGrowth, width, height, maxCurl);
+        const baseAngle = angle + side * (0.38 + localOpen * 0.92);
+        const fold = (1 - localOpen) * side * 1.45;
+        const lengthProfile = Math.sin(t * Math.PI) * (0.62 + 0.38 * easedGrowth);
+        const length = maxLeafletLength * lengthProfile * visibility;
+
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate(baseAngle - fold);
+        ctx.scale(0.22 + localOpen * 0.78, 0.2 + localOpen * 0.8);
+        drawLeaflet(length, 3, localOpen * visibility);
+        ctx.restore();
+      }
+
+      // The curled growing tip: visible until the frond is almost fully open.
+      const tip = getStemPoint(1, easedGrowth, width, height, maxCurl);
+      const tipRadius = Math.min(width, height) * (0.09 * (1 - easedGrowth) + 0.018);
+      if (tipRadius > 4) {
+        ctx.save();
+        ctx.translate(tip.x, tip.y);
+        ctx.rotate(-Math.PI * 0.35 + easedGrowth * Math.PI * 1.2);
+        ctx.strokeStyle = `rgba(196, 255, 176, ${0.72 - easedGrowth * 0.34})`;
+        ctx.lineWidth = 4;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        for (let a = 0; a < Math.PI * 4.8; a += 0.06) {
+          const r = tipRadius * (1 - a / (Math.PI * 5.4));
+          const x = Math.cos(a) * r;
+          const y = Math.sin(a) * r;
+          if (a === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      ctx.restore();
+
+      ctx.fillStyle = 'rgba(143, 255, 180, 0.12)';
+      ctx.beginPath();
+      ctx.ellipse(width / 2, height - 18, width * 0.18, 13, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    function requestRender() {
+      if (renderQueued) return;
+      renderQueued = true;
+      requestAnimationFrame(() => {
+        renderQueued = false;
+        render(performance.now());
+      });
+    }
+
+    function render(now = performance.now()) {
+      const rect = canvas.getBoundingClientRect();
+      const width = rect.width;
+      const height = rect.height;
+
+      ctx.clearRect(0, 0, width, height);
+      drawBackground(width, height);
+      drawFern(width, height, now / 1000);
+    }
+
+    function animate(now) {
+      const delta = Math.min(0.05, (now - lastTime) / 1000);
+      lastTime = now;
+
+      if (playing) {
+        autoGrowth += delta * 0.07;
+        if (autoGrowth > 1) autoGrowth = 1;
+        requestRender();
+      }
+
+      requestAnimationFrame(animate);
+    }
+
+    [growthSlider, leafletsSlider, curlSlider].forEach(input => {
+      input.addEventListener('input', requestRender);
+    });
+
+    playBtn.addEventListener('click', () => {
+      playing = !playing;
+      playBtn.textContent = playing ? 'Пауза' : 'Старт';
+      requestRender();
+    });
+
+    resetBtn.addEventListener('click', () => {
+      autoGrowth = 0;
+      growthSlider.value = 0;
+      playing = true;
+      playBtn.textContent = 'Пауза';
+      requestRender();
+    });
+
+    window.addEventListener('resize', resizeCanvas);
+
+    resizeCanvas();
+    requestAnimationFrame(animate);
+  </script>
+</body>
+</html>
