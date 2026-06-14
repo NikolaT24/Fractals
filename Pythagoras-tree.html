@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Питагорово дърво</title>
+  <style>
+    :root {
+      --bg-1: #070816;
+      --bg-2: #111329;
+      --panel: rgba(28, 30, 56, 0.78);
+      --panel-border: rgba(255, 255, 255, 0.12);
+      --text: #eef2ff;
+      --muted: #aab3d6;
+      --accent: #8bd5ff;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      color: var(--text);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at 20% 10%, rgba(139, 213, 255, 0.16), transparent 28rem),
+        radial-gradient(circle at 82% 20%, rgba(203, 166, 247, 0.13), transparent 30rem),
+        linear-gradient(135deg, var(--bg-1), var(--bg-2) 55%, #090a18);
+    }
+
+    .app {
+      width: min(1040px, calc(100vw - 28px));
+      padding: 28px 0;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 18px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(2rem, 5vw, 4.2rem);
+      line-height: 1;
+      font-weight: 800;
+      letter-spacing: -0.06em;
+      background: linear-gradient(90deg, #f5e0dc, #8bd5ff, #a6e3a1);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+
+    .subtitle {
+      margin: 12px auto 0;
+      max-width: 620px;
+      color: var(--muted);
+      font-size: 1rem;
+    }
+
+    .controls {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+      background: var(--panel);
+      border: 1px solid var(--panel-border);
+      backdrop-filter: blur(14px);
+      padding: 16px;
+      border-radius: 24px;
+      margin: 22px auto;
+      box-shadow: 0 18px 44px rgba(0, 0, 0, 0.32);
+    }
+
+    .control-group {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding: 14px;
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.045);
+    }
+
+    label {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      color: var(--muted);
+      font-size: 0.9rem;
+      font-weight: 650;
+    }
+
+    label span {
+      color: var(--text);
+      font-variant-numeric: tabular-nums;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--accent);
+      cursor: pointer;
+    }
+
+    .stage {
+      border-radius: 28px;
+      padding: 1px;
+      background: linear-gradient(135deg, rgba(139,213,255,0.42), rgba(166,227,161,0.24), rgba(203,166,247,0.32));
+      box-shadow: 0 24px 62px rgba(0, 0, 0, 0.42);
+      overflow: hidden;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: min(68vh, 650px);
+      min-height: 420px;
+      border-radius: 27px;
+      background: #080a16;
+    }
+
+    .hint {
+      text-align: center;
+      color: rgba(238, 242, 255, 0.58);
+      font-size: 0.88rem;
+      margin-top: 14px;
+    }
+
+    @media (max-width: 760px) {
+      .controls { grid-template-columns: 1fr; }
+      canvas { min-height: 520px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header>
+      <h1>Питагорово дърво</h1>
+      <p class="subtitle">Интерактивна визуализация на Питагорово дърво – фрактална структура, базирана на Питагоровата теорема, с динамично управление на параметрите.</p>
+    </header>
+
+    <section class="controls" aria-label="Fractal controls">
+      <div class="control-group">
+        <label for="depth">Дълбочина <span id="depthVal">9</span></label>
+        <input type="range" id="depth" min="1" max="11" value="9" />
+      </div>
+      <div class="control-group">
+        <label for="angle">Ъгъл <span id="angleVal">45°</span></label>
+        <input type="range" id="angle" min="15" max="75" value="45" />
+      </div>
+      <div class="control-group">
+        <label for="spread">Мащаб <span id="spreadVal">86</span></label>
+        <input type="range" id="spread" min="55" max="115" value="86" />
+      </div>
+    </section>
+
+    <section class="stage">
+      <canvas id="fractalCanvas"></canvas>
+    </section>
+
+    <p class="hint">Дървото реагира на всяко движение – променяш параметрите, и то расте наново ✦</p>
+  </main>
+
+  <script>
+    const canvas = document.getElementById('fractalCanvas');
+    const ctx = canvas.getContext('2d');
+
+    const depthSlider = document.getElementById('depth');
+    const angleSlider = document.getElementById('angle');
+    const spreadSlider = document.getElementById('spread');
+
+    const depthVal = document.getElementById('depthVal');
+    const angleVal = document.getElementById('angleVal');
+    const spreadVal = document.getElementById('spreadVal');
+
+    const colors = Array.from({ length: 12 }, (_, i) => {
+      const t = i / 11;
+      return `hsl(${28 + t * 118} ${58 + t * 22}% ${30 + t * 34}%)`;
+    });
+
+    let renderQueued = false;
+
+    function requestRender() {
+      if (renderQueued) return;
+      renderQueued = true;
+      requestAnimationFrame(() => {
+        renderQueued = false;
+        render();
+      });
+    }
+
+    function resizeCanvas() {
+      const rect = canvas.getBoundingClientRect();
+      const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+      canvas.width = Math.floor(rect.width * dpr);
+      canvas.height = Math.floor(rect.height * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      requestRender();
+    }
+
+    function drawBackground(width, height) {
+      const sky = ctx.createLinearGradient(0, 0, 0, height);
+      sky.addColorStop(0, '#080a18');
+      sky.addColorStop(0.62, '#10122a');
+      sky.addColorStop(1, '#05060d');
+      ctx.fillStyle = sky;
+      ctx.fillRect(0, 0, width, height);
+
+      const moonGlow = ctx.createRadialGradient(width * 0.78, height * 0.18, 5, width * 0.78, height * 0.18, 90);
+      moonGlow.addColorStop(0, 'rgba(245, 224, 220, 0.95)');
+      moonGlow.addColorStop(0.25, 'rgba(245, 224, 220, 0.6)');
+      moonGlow.addColorStop(0.5, 'rgba(139, 213, 255, 0.25)');
+      moonGlow.addColorStop(1, 'rgba(139, 213, 255, 0)');
+
+      ctx.fillStyle = moonGlow;
+      ctx.beginPath();
+      ctx.arc(width * 0.78, height * 0.18, 90, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = 'rgba(245, 224, 220, 0.9)';
+      ctx.beginPath();
+      ctx.arc(width * 0.78, height * 0.18, 28, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = 'rgba(255,255,255,0.55)';
+      for (let i = 0; i < 44; i++) {
+        const x = (Math.sin(i * 91.7) * 0.5 + 0.5) * width;
+        const y = (Math.sin(i * 37.31 + 4) * 0.5 + 0.5) * height * 0.7;
+        const radius = i % 9 === 0 ? 1.25 : 0.75;
+        ctx.beginPath();
+        ctx.arc(x, y, radius, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      const ground = ctx.createRadialGradient(width / 2, height * 1.06, 20, width / 2, height * 1.06, width * 0.58);
+      ground.addColorStop(0, 'rgba(124, 231, 172, 0.22)');
+      ground.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = ground;
+      ctx.fillRect(0, 0, width, height);
+    }
+
+    function drawTree(size, depth, maxDepth, angleRad) {
+      if (depth <= 0 || size < 0.7) return;
+
+      ctx.fillStyle = colors[Math.max(0, Math.min(colors.length - 1, maxDepth - depth))];
+      ctx.fillRect(0, -size, size, size);
+
+      if (depth < 4) {
+        ctx.fillStyle = 'rgba(217, 249, 157, 0.24)';
+        ctx.beginPath();
+        ctx.ellipse(size * 0.5, -size * 1.04, size * 0.24, size * 0.1, Math.PI / 5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      const leftSize = size * Math.cos(angleRad);
+      const rightSize = size * Math.sin(angleRad);
+
+      ctx.save();
+      ctx.translate(0, -size);
+      ctx.rotate(-angleRad);
+      drawTree(leftSize, depth - 1, maxDepth, angleRad);
+      ctx.restore();
+
+      ctx.save();
+      ctx.translate(size, -size);
+      ctx.rotate((Math.PI / 2) - angleRad);
+      ctx.translate(-rightSize, 0);
+      drawTree(rightSize, depth - 1, maxDepth, angleRad);
+      ctx.restore();
+    }
+
+    function render() {
+      const rect = canvas.getBoundingClientRect();
+      const width = rect.width;
+      const height = rect.height;
+
+      const depth = Number(depthSlider.value);
+      const angle = Number(angleSlider.value);
+      const spread = Number(spreadSlider.value);
+      const angleRad = angle * Math.PI / 180;
+
+      depthVal.textContent = depth;
+      angleVal.textContent = `${angle}°`;
+      spreadVal.textContent = spread;
+
+      ctx.clearRect(0, 0, width, height);
+      drawBackground(width, height);
+
+      ctx.save();
+      ctx.translate(width / 2 - spread / 2, height - 34);
+      drawTree(spread, depth, depth, angleRad);
+      ctx.restore();
+
+      ctx.fillStyle = 'rgba(124, 231, 172, 0.14)';
+      ctx.beginPath();
+      ctx.ellipse(width / 2, height - 18, spread * 1.2, 13, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    [depthSlider, angleSlider, spreadSlider].forEach(input => {
+      input.addEventListener('input', requestRender);
+    });
+
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+  </script>
+</body>
+</html>
